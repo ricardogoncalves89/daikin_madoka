@@ -1,17 +1,12 @@
-"""Daikin Madoka consts."""
+"""Constants for the Daikin Madoka integration."""
 
+# Home Assistant integration domain — must match the folder name
+# and the "domain" field in manifest.json.
 DOMAIN = "daikin_madoka"
-TITLE = "BRC1H"
-UNIQUE_ID = "BRC1H-id"
 
-CONTROLLERS = "controllers"
+# Human-readable name shown in the HA UI during config flow.
+TITLE = "Daikin Madoka"
 
-ATTR_TARGET_TEMPERATURE = "target_temperature"
-ATTR_INSIDE_TEMPERATURE = "inside_temperature"
-ATTR_OUTSIDE_TEMPERATURE = "outside_temperature"
-SENSOR_TYPE_TEMPERATURE = "temperature"
-
+# Temperature range supported by the BRC1H hardware (°C).
 MIN_TEMP = 16
 MAX_TEMP = 32
-
-TIMEOUT = 60
