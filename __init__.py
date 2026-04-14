@@ -26,7 +26,7 @@ from .coordinator import MadokaCoordinator
 
 # All HA entity platforms provided by this integration.
 # Each platform has its own .py file in this package.
-PLATFORMS = ["climate", "sensor", "binary_sensor", "button", "number"]
+PLATFORMS = ["climate", "sensor", "binary_sensor", "button", "number", "fan", "select"]
 
 _LOGGER = logging.getLogger(__name__)
 
