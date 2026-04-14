@@ -44,9 +44,12 @@ from .madoka_protocol import (
     CMD_GET_CLEAN_FILTER,
     CMD_GET_VERSION,
     CMD_GET_EYE_BRIGHTNESS,
+    CMD_GET_VENTILATION,
     MadokaState,
     OperationMode,
     FanSpeed,
+    VentilationMode,
+    VentilationRate,
     cmd_get_power,
     cmd_get_mode,
     cmd_get_setpoint,
@@ -61,6 +64,8 @@ from .madoka_protocol import (
     cmd_get_version,
     cmd_get_eye_brightness,
     cmd_set_eye_brightness,
+    cmd_get_ventilation,
+    cmd_set_ventilation,
     decode_power,
     decode_mode,
     decode_setpoint,
@@ -69,6 +74,7 @@ from .madoka_protocol import (
     decode_clean_filter,
     decode_version,
     decode_eye_brightness,
+    decode_ventilation,
 )
 from .const import DOMAIN
 
@@ -93,8 +99,21 @@ class MadokaCoordinator(DataUpdateCoordinator[MadokaState]):
         self.state = MadokaState()
 
     async def async_start(self) -> None:
-        """Start the BLE client and schedule first refresh."""
+        """Start the BLE client and probe for ventilation support."""
         await self._client.async_start()
+        # Probe for ventilation support (VAM-FC9 units respond to CMD 0x0031)
+        try:
+            vals = await self._client.async_query(
+                cmd_get_ventilation(), CMD_GET_VENTILATION
+            )
+            mode, rate = decode_ventilation(vals)
+            self.state.is_ventilation_device = True
+            self.state.ventilation_mode = mode
+            self.state.ventilation_rate = rate
+            _LOGGER.info("Device %s detected as ventilation unit", self.address)
+        except Exception:
+            self.state.is_ventilation_device = False
+            _LOGGER.debug("Device %s is not a ventilation unit", self.address)
 
     async def async_stop(self) -> None:
         """Stop the BLE client."""
@@ -215,6 +234,21 @@ class MadokaCoordinator(DataUpdateCoordinator[MadokaState]):
             except Exception as err:
                 _LOGGER.debug("Eye brightness read failed: %s", err)
 
+            # 9. Ventilation (only for VAM-FC9 units)
+            if self.state.is_ventilation_device:
+                await asyncio.sleep(_QUERY_PAUSE)
+                try:
+                    vals = await self._client.async_query(
+                        cmd_get_ventilation(), CMD_GET_VENTILATION
+                    )
+                    mode, rate = decode_ventilation(vals)
+                    if mode is not None:
+                        self.state.ventilation_mode = mode
+                    if rate is not None:
+                        self.state.ventilation_rate = rate
+                except Exception as err:
+                    _LOGGER.debug("Ventilation read failed: %s", err)
+
             _LOGGER.debug(
                 "Poll complete: power=%s mode=%s cool=%.0f°C heat=%.0f°C indoor=%s outdoor=%s",
                 self.state.power_on,
@@ -277,4 +311,13 @@ class MadokaCoordinator(DataUpdateCoordinator[MadokaState]):
         """Set eye LED brightness (0-19)."""
         await self._client.async_send_command(cmd_set_eye_brightness(level))
         self.state.eye_brightness = level
+        self.async_set_updated_data(self.state)
+
+    async def async_set_ventilation(
+        self, mode: VentilationMode, rate: VentilationRate
+    ) -> None:
+        """Set ventilation mode and rate (VAM-FC9 only)."""
+        await self._client.async_send_command(cmd_set_ventilation(mode, rate))
+        self.state.ventilation_mode = mode
+        self.state.ventilation_rate = rate
         self.async_set_updated_data(self.state)

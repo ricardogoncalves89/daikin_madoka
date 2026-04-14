@@ -48,6 +48,18 @@ class FanSpeed(Enum):
     HIGH = 5
 
 
+class VentilationMode(Enum):
+    AUTO = 0
+    ERV = 1
+    BYPASS = 2
+
+
+class VentilationRate(Enum):
+    AUTO = 0
+    LOW = 1
+    HIGH = 5
+
+
 # ─── Command IDs ─────────────────────────────────────────────
 # Get commands
 CMD_GET_POWER = 0x0020
@@ -68,6 +80,10 @@ CMD_SET_FAN = 0x4050
 CMD_RESET_FILTER = 0x4220
 CMD_SET_EYE_BRIGHTNESS = 0x4302
 
+# Ventilation commands (for VAM-FC9 recuperation units)
+CMD_GET_VENTILATION = 0x0031
+CMD_SET_VENTILATION = 0x4031
+
 # TLV parameter IDs
 PARAM_POWER = 0x20
 PARAM_MODE = 0x20
@@ -83,6 +99,10 @@ PARAM_CLEAN_FILTER = 0x62
 PARAM_VERSION_RC = 0x45
 PARAM_VERSION_BLE = 0x46
 PARAM_EYE_BRIGHTNESS = 0x33
+
+# Ventilation param IDs (CMD 0x0031 / 0x4031)
+PARAM_VENT_MODE = 0x20
+PARAM_VENT_RATE = 0x21
 
 
 # ─── Data Classes ────────────────────────────────────────────
@@ -102,6 +122,10 @@ class MadokaState:
     firmware_rc: Optional[str] = None
     firmware_ble: Optional[str] = None
     eye_brightness: Optional[int] = None
+    # Ventilation (VAM-FC9 only; None when device is not a ventilation unit)
+    ventilation_mode: Optional[VentilationMode] = None
+    ventilation_rate: Optional[VentilationRate] = None
+    is_ventilation_device: bool = False
 
 
 # ─── Chunking ────────────────────────────────────────────────
@@ -386,3 +410,38 @@ def decode_eye_brightness(values: Dict[int, bytes]) -> Optional[int]:
     if raw is None:
         return None
     return raw[0]
+
+
+# ─── Ventilation Command Builders ────────────────────────────
+def cmd_get_ventilation() -> list[bytes]:
+    return build_chunked_command(CMD_GET_VENTILATION)
+
+
+def cmd_set_ventilation(mode: VentilationMode, rate: VentilationRate) -> list[bytes]:
+    return build_chunked_command(CMD_SET_VENTILATION, {
+        PARAM_VENT_MODE: mode.value.to_bytes(1, "big"),
+        PARAM_VENT_RATE: rate.value.to_bytes(1, "big"),
+    })
+
+
+# ─── Ventilation Response Decoders ───────────────────────────
+def decode_ventilation(values: Dict[int, bytes]) -> tuple[Optional[VentilationMode], Optional[VentilationRate]]:
+    """Decode ventilation response. Returns (mode, rate)."""
+    mode = None
+    rate = None
+    raw_mode = values.get(PARAM_VENT_MODE)
+    raw_rate = values.get(PARAM_VENT_RATE)
+    if raw_mode is not None:
+        try:
+            mode = VentilationMode(int.from_bytes(raw_mode, "big"))
+        except ValueError:
+            pass
+    if raw_rate is not None:
+        v = int.from_bytes(raw_rate, "big")
+        if v >= 3:
+            rate = VentilationRate.HIGH
+        elif v >= 1:
+            rate = VentilationRate.LOW
+        else:
+            rate = VentilationRate.AUTO
+    return mode, rate
