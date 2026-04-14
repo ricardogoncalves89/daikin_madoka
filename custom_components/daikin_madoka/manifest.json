@@ -2,7 +2,7 @@
   "domain": "daikin_madoka",
   "name": "Daikin Madoka",
   "config_flow": true,
-  "documentation": "https://github.com/zobylamouche/daikin_madoka",
+  "documentation": "https://github.com/ricardogoncalves89/daikin_madoka",
   "dependencies": ["bluetooth"],
   "requirements": ["bleak-retry-connector>=3.5.0"],
   "bluetooth": [
@@ -11,7 +11,7 @@
     { "local_name": "BRC*" },
     { "local_name": "Daikin*" }
   ],
-  "codeowners": ["@zobylamouche"],
+  "codeowners": ["@ricardogoncalves89"],
   "iot_class": "local_polling",
   "version": "2.0.0"
 }
